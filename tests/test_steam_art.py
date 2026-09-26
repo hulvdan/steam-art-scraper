@@ -1,6 +1,6 @@
 import pytest
 
-from steam_art_scraper.scraper import artwork_from_item, parse_app_id
+from scraper import ScrapedApp, artwork_from_item, parse_app_id
 
 CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 
@@ -49,3 +49,15 @@ def test_artwork_from_item() -> None:
         "screenshot_01": f"{CDN}steam/apps/367520/ss_a.jpg?t=1",
         "screenshot_02": f"{CDN}steam/apps/367520/ss_b.jpg?t=1",
     }
+
+
+@pytest.mark.parametrize(
+    ("slug", "expected"),
+    [
+        ("Hollow_Knight", "367520 Hollow_Knight"),
+        ("Bad:Name/With*Chars?.", "367520 Bad_Name_With_Chars_"),
+        ("", "367520"),
+    ],
+)
+def test_dir_name(slug: str, expected: str) -> None:
+    assert ScrapedApp(367520, "", slug, []).dir_name == expected

@@ -1,17 +1,22 @@
-# Agent rules
+# Правила для агентов
 
-Rules live in two places and must stay in sync: this file (Claude) and `.cursor/rules/*.mdc` (Cursor).
-Whenever you add, change or remove a rule, update both.
+Правила хранятся в двух местах и должны совпадать: этот файл (Claude) и `.cursor/rules/*.mdc` (Cursor).
+При добавлении, изменении или удалении правила обновляй оба.
 
-## Git commits
+## Git-коммиты
 
-- After finishing a code change and before committing, run a reviewer subagent on the diff
-  (e.g. `caveman:cavecrew-reviewer`). Fix or explicitly dismiss its findings, then commit.
-- Write commit messages in Russian, as a single line. Use impersonal passive past form
-  ("Сделан X", "Добавлен Y", "Исправлена Z"), not first person ("Сделал X").
-- Never add `Co-Authored-By` (or any AI attribution) trailers to commit messages or PR descriptions.
+- После завершения изменений в коде и перед коммитом запусти сабагента-ревьюера на дифф
+  (например, `caveman:cavecrew-reviewer`). Исправь или явно отклони его замечания, затем коммить.
+- Сообщения коммитов пиши на русском, одной строкой, в безличной страдательной форме
+  («Сделан X», «Добавлен Y», «Исправлена Z»), а не от первого лица («Сделал X»).
+- Никогда не добавляй `Co-Authored-By` (и любую другую AI-атрибуцию) в коммиты и описания PR.
 
 ## Python
 
-- Prefix module-level names (constants, functions, classes, variables) with `_` unless they are
-  used outside their module (including tests).
+- Комментарии и докстринги в коде пиши на русском.
+- Добавляй префикс `_` к именам уровня модуля (константы, функции, классы, переменные), если они
+  не используются за пределами модуля (тесты считаются использованием снаружи).
+
+## Документация
+
+- Markdown-файлы (`*.md`) пиши на русском.

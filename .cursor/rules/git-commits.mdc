@@ -1,8 +1,8 @@
 ---
-description: Git commit message rules
+description: Правила для git-коммитов
 alwaysApply: true
 ---
 
-- After finishing a code change and before committing, run a reviewer subagent on the diff. Fix or explicitly dismiss its findings, then commit.
-- Write commit messages in Russian, as a single line. Use impersonal passive past form ("Сделан X", "Добавлен Y", "Исправлена Z"), not first person ("Сделал X").
-- Never add `Co-authored-by` (or any AI attribution) trailers to commit messages or PR descriptions.
+- После завершения изменений в коде и перед коммитом запусти сабагента-ревьюера на дифф. Исправь или явно отклони его замечания, затем коммить.
+- Сообщения коммитов пиши на русском, одной строкой, в безличной страдательной форме («Сделан X», «Добавлен Y», «Исправлена Z»), а не от первого лица («Сделал X»).
+- Никогда не добавляй `Co-authored-by` (и любую другую AI-атрибуцию) в коммиты и описания PR.

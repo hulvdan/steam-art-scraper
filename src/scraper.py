@@ -1,6 +1,6 @@
-"""Scrape artwork (capsules, header, hero, logo, screenshots, ...) for a Steam app.
+"""Скачивание арта Steam-приложения (капсулы, хедер, хиро, лого, скриншоты и т.д.).
 
-Videos/trailers are intentionally excluded.
+Видео и трейлеры намеренно исключены.
 """
 
 import json
@@ -17,7 +17,7 @@ _ASSET_CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 _PAGE_BACKGROUND_CDN = "https://store.akamai.steamstatic.com/images/storepagebackground/"
 _COMMUNITY_ICON_CDN = "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/"
 
-# Keys of `assets` in the GetItems response that hold image filenames.
+# Ключи `assets` в ответе GetItems, содержащие имена файлов картинок.
 _ASSET_KEYS = (
     "header",
     "header_2x",
@@ -33,13 +33,15 @@ _ASSET_KEYS = (
     "library_hero_2x",
 )
 
-# Legacy unhashed paths not exposed by GetItems; probed and kept only if they exist.
+# Старые пути без хеша, которых нет в GetItems; проверяются и берутся, только если существуют.
 _PROBED_ASSETS = {
     "logo": "logo.png",
     "logo_2x": "logo_2x.png",
 }
 
 _APP_URL_RE = re.compile(r"/app/(\d+)")
+# Символы, недопустимые в именах файлов Windows.
+_UNSAFE_PATH_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 _CONTENT_TYPE_EXT = {
     "image/jpeg": ".jpg",
@@ -55,12 +57,26 @@ class Artwork:
     url: str
 
 
+@dataclass(frozen=True)
+class ScrapedApp:
+    app_id: int
+    name: str
+    slug: str
+    artworks: list[Artwork]
+
+    @property
+    def dir_name(self) -> str:
+        """Имя папки вида `367520 Hollow_Knight`."""
+        slug = _UNSAFE_PATH_CHARS_RE.sub("_", self.slug).strip(" .")
+        return f"{self.app_id} {slug}" if slug else str(self.app_id)
+
+
 class SteamAppNotFound(LookupError):
     pass
 
 
 def parse_app_id(app: str | int) -> int:
-    """Accept an app id (int or digit string) or a store URL like .../app/367520/Name/."""
+    """Принимает app id (int или строку из цифр) или URL магазина вида .../app/367520/Name/."""
     if isinstance(app, int):
         return app
     app = app.strip()
@@ -86,7 +102,7 @@ def _fetch_store_item(app_id: int, client: httpx.Client) -> dict[str, Any]:
 
 
 def artwork_from_item(app_id: int, item: dict[str, Any]) -> list[Artwork]:
-    """Build artwork URLs from a GetItems store item. Pure, no network."""
+    """Собирает URL арта из элемента ответа GetItems. Чистая функция, без сети."""
     assets: dict[str, Any] = item.get("assets", {})
     url_format: str = assets.get("asset_url_format", f"steam/apps/{app_id}/${{FILENAME}}")
 
@@ -119,14 +135,17 @@ def _probe_legacy_assets(app_id: int, client: httpx.Client) -> list[Artwork]:
     return found
 
 
-def scrape_artwork(app: str | int, client: httpx.Client | None = None) -> list[Artwork]:
-    """Return all artwork (no videos) for a Steam app id or store URL."""
+def scrape_artwork(app: str | int, client: httpx.Client | None = None) -> ScrapedApp:
+    """Возвращает весь арт (без видео) для app id или URL магазина Steam."""
     app_id = parse_app_id(app)
     owns_client = client is None
     client = client or httpx.Client(timeout=30, follow_redirects=True)
     try:
         item = _fetch_store_item(app_id, client)
-        return artwork_from_item(app_id, item) + _probe_legacy_assets(app_id, client)
+        name: str = item.get("name", "")
+        slug: str = item.get("store_url_slug") or name.replace(" ", "_")
+        artworks = artwork_from_item(app_id, item) + _probe_legacy_assets(app_id, client)
+        return ScrapedApp(app_id, name, slug, artworks)
     finally:
         if owns_client:
             client.close()

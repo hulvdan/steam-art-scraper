@@ -1,7 +1,8 @@
 ---
-description: Python code conventions
+description: Соглашения для Python-кода
 globs: **/*.py
 alwaysApply: false
 ---
 
-- Prefix module-level names (constants, functions, classes, variables) with `_` unless they are used outside their module (including tests).
+- Комментарии и докстринги в коде пиши на русском.
+- Добавляй префикс `_` к именам уровня модуля (константы, функции, классы, переменные), если они не используются за пределами модуля (тесты считаются использованием снаружи).

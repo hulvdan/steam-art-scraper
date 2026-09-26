@@ -1,0 +1,7 @@
+---
+description: Правила для документации
+globs: **/*.md
+alwaysApply: false
+---
+
+- Markdown-файлы (`*.md`) пиши на русском.
