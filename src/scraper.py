@@ -6,6 +6,7 @@
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -64,11 +65,10 @@ class ScrapedApp:
     slug: str
     artworks: list[Artwork]
 
-    @property
-    def dir_name(self) -> str:
-        """Имя папки вида `367520 Hollow_Knight`."""
-        slug = _UNSAFE_PATH_CHARS_RE.sub("_", self.slug).strip(" .")
-        return f"{self.app_id} {slug}" if slug else str(self.app_id)
+    def dir_name(self, at: datetime) -> str:
+        """Имя папки вида `20260926 130512 - Hollow_Knight` (время импорта)."""
+        slug = _UNSAFE_PATH_CHARS_RE.sub("_", self.slug).strip(" .") or str(self.app_id)
+        return f"{at:%Y%m%d %H%M%S} - {slug}"
 
 
 class SteamAppNotFound(LookupError):

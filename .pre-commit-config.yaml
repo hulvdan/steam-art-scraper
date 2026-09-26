@@ -23,3 +23,9 @@ repos:
         language: system
         types_or: [python, pyi]
         pass_filenames: false
+      - id: empty-to-import
+        name: _TO_IMPORT.txt has no entries
+        # Файл коммитится только с комментариями; список игр — локальный.
+        entry: '^\s*[^#\s]'
+        language: pygrep
+        files: ^_TO_IMPORT\.txt$

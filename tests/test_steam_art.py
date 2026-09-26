@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 
 from scraper import ScrapedApp, artwork_from_item, parse_app_id
@@ -51,13 +53,16 @@ def test_artwork_from_item() -> None:
     }
 
 
+_AT = datetime(2026, 9, 26, 13, 5, 2)
+
+
 @pytest.mark.parametrize(
     ("slug", "expected"),
     [
-        ("Hollow_Knight", "367520 Hollow_Knight"),
-        ("Bad:Name/With*Chars?.", "367520 Bad_Name_With_Chars_"),
-        ("", "367520"),
+        ("Hollow_Knight", "20260926 130502 - Hollow_Knight"),
+        ("Bad:Name/With*Chars?.", "20260926 130502 - Bad_Name_With_Chars_"),
+        ("", "20260926 130502 - 367520"),
     ],
 )
 def test_dir_name(slug: str, expected: str) -> None:
-    assert ScrapedApp(367520, "", slug, []).dir_name == expected
+    assert ScrapedApp(367520, "", slug, []).dir_name(_AT) == expected
