@@ -4,7 +4,15 @@ from pathlib import Path
 import httpx
 import pytest
 
-from scraper import Artwork, ScrapedApp, artwork_from_item, download_artwork, parse_app_id
+from scraper import (
+    Artwork,
+    ScrapedApp,
+    artwork_from_item,
+    download_artwork,
+    import_artwork,
+    parse_app_id,
+    remove_partials,
+)
 
 CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 
@@ -84,3 +92,34 @@ def test_download_artwork_skips_404(tmp_path: Path) -> None:
         paths = download_artwork(arts, tmp_path, client)
     assert paths == [tmp_path / "ok.jpg"]
     assert (tmp_path / "ok.jpg").read_bytes() == b"img"
+
+
+def test_import_artwork_renames_on_success(tmp_path: Path) -> None:
+    arts = [Artwork("ok", "https://cdn.test/ok.jpg")]
+    transport = httpx.MockTransport(lambda _: httpx.Response(200, content=b"img"))
+    with httpx.Client(transport=transport) as client:
+        paths = import_artwork(arts, tmp_path / "game", client)
+    assert paths == [tmp_path / "game" / "ok.jpg"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["game"]
+
+
+def test_import_artwork_leaves_nothing_on_failure(tmp_path: Path) -> None:
+    arts = [Artwork("ok", "https://cdn.test/ok.jpg"), Artwork("bad", "https://cdn.test/bad.jpg")]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500 if "bad" in request.url.path else 200, content=b"img")
+
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as client,
+        pytest.raises(httpx.HTTPStatusError),
+    ):
+        import_artwork(arts, tmp_path / "game", client)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_remove_partials(tmp_path: Path) -> None:
+    (tmp_path / "a.partial").mkdir()
+    (tmp_path / "a.partial" / "x.jpg").write_bytes(b"")
+    (tmp_path / "20260101 000000 - B").mkdir()
+    remove_partials(tmp_path)
+    assert [p.name for p in tmp_path.iterdir()] == ["20260101 000000 - B"]

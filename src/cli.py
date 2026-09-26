@@ -5,7 +5,7 @@ from typing import Annotated
 import httpx
 import typer
 
-from scraper import SteamAppNotFound, download_artwork, scrape_artwork
+from scraper import SteamAppNotFound, import_artwork, remove_partials, scrape_artwork
 
 app = typer.Typer(help="Download Steam app artwork (no videos).")
 
@@ -43,6 +43,9 @@ def _main(
         typer.echo("Nothing to import.", err=True)
         return
 
+    if not list_only:
+        remove_partials(out)
+
     failed = False
     for app_ref in refs:
         try:
@@ -52,8 +55,8 @@ def _main(
                     typer.echo(f"{scraped.app_id}\t{art.name}\t{art.url}")
                 continue
             dir_name = scraped.dir_name(datetime.now())
-            paths = download_artwork(scraped.artworks, out / dir_name)
-        except (ValueError, SteamAppNotFound, httpx.HTTPError) as e:
+            paths = import_artwork(scraped.artworks, out / dir_name)
+        except (ValueError, SteamAppNotFound, httpx.HTTPError, OSError) as e:
             typer.echo(f"Error ({app_ref}): {e}", err=True)
             failed = True
             continue

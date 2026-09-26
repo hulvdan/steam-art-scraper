@@ -5,6 +5,7 @@
 
 import json
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -43,6 +44,9 @@ _PROBED_ASSETS = {
 _APP_URL_RE = re.compile(r"/app/(\d+)")
 # Символы, недопустимые в именах файлов Windows.
 _UNSAFE_PATH_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+# Суффикс папки, в которую идёт загрузка; до переименования игра считается неимпортированной.
+_PARTIAL_SUFFIX = ".partial"
 
 _CONTENT_TYPE_EXT = {
     "image/jpeg": ".jpg",
@@ -179,3 +183,28 @@ def download_artwork(
         if owns_client:
             client.close()
     return paths
+
+
+def import_artwork(
+    artworks: list[Artwork], dest: Path, client: httpx.Client | None = None
+) -> list[Path]:
+    """Скачивает арт в `<dest>.partial` и переименовывает в `dest` только после успеха.
+
+    Папка с финальным именем существует, только если импорт игры завершён целиком.
+    """
+    staging = dest.with_name(dest.name + _PARTIAL_SUFFIX)
+    try:
+        paths = download_artwork(artworks, staging, client)
+        staging.rename(dest)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return [dest / p.name for p in paths]
+
+
+def remove_partials(out: Path) -> None:
+    """Удаляет недокачанные папки `*.partial`, оставшиеся после прерванного запуска."""
+    if out.is_dir():
+        for path in out.glob("*" + _PARTIAL_SUFFIX):
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
