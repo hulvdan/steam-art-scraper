@@ -161,6 +161,7 @@ def _extension(url: str, content_type: str) -> str:
 def download_artwork(
     artworks: list[Artwork], dest: Path, client: httpx.Client | None = None
 ) -> list[Path]:
+    """Скачивает арт в `dest`. Отсутствующие на CDN файлы (404) пропускаются."""
     dest.mkdir(parents=True, exist_ok=True)
     owns_client = client is None
     client = client or httpx.Client(timeout=30, follow_redirects=True)
@@ -168,6 +169,8 @@ def download_artwork(
     try:
         for art in artworks:
             resp = client.get(art.url)
+            if resp.status_code == httpx.codes.NOT_FOUND:
+                continue
             resp.raise_for_status()
             path = dest / (art.name + _extension(art.url, resp.headers.get("content-type", "")))
             path.write_bytes(resp.content)

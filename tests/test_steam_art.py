@@ -1,8 +1,10 @@
 from datetime import datetime
+from pathlib import Path
 
+import httpx
 import pytest
 
-from scraper import ScrapedApp, artwork_from_item, parse_app_id
+from scraper import Artwork, ScrapedApp, artwork_from_item, download_artwork, parse_app_id
 
 CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 
@@ -66,3 +68,19 @@ _AT = datetime(2026, 9, 26, 13, 5, 2)
 )
 def test_dir_name(slug: str, expected: str) -> None:
     assert ScrapedApp(367520, "", slug, []).dir_name(_AT) == expected
+
+
+def test_download_artwork_skips_404(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("missing.jpg"):
+            return httpx.Response(404)
+        return httpx.Response(200, content=b"img", headers={"content-type": "image/jpeg"})
+
+    arts = [
+        Artwork("ok", "https://cdn.test/ok.jpg"),
+        Artwork("gone", "https://cdn.test/missing.jpg"),
+    ]
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        paths = download_artwork(arts, tmp_path, client)
+    assert paths == [tmp_path / "ok.jpg"]
+    assert (tmp_path / "ok.jpg").read_bytes() == b"img"

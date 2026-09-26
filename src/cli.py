@@ -57,7 +57,8 @@ def _main(
             typer.echo(f"Error ({app_ref}): {e}", err=True)
             failed = True
             continue
-        typer.echo(f"{dir_name}: {len(paths)} files")
+        missing = len(scraped.artworks) - len(paths)
+        typer.echo(f"{dir_name}: {len(paths)} files" + (f" ({missing} missing)" if missing else ""))
 
     if failed:
         raise typer.Exit(1)
