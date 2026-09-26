@@ -20,25 +20,20 @@ _PAGE_BACKGROUND_CDN = "https://store.akamai.steamstatic.com/images/storepagebac
 _COMMUNITY_ICON_CDN = "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/"
 
 # Ключи `assets` в ответе GetItems, содержащие имена файлов картинок.
+# Берётся `<key>_2x`, если есть, иначе `<key>`; файл сохраняется под именем `<key>`.
 _ASSET_KEYS = (
     "header",
-    "header_2x",
     "main_capsule",
-    "main_capsule_2x",
     "small_capsule",
-    "small_capsule_2x",
     "hero_capsule",
-    "hero_capsule_2x",
     "library_capsule",
-    "library_capsule_2x",
     "library_hero",
-    "library_hero_2x",
 )
 
-# Старые пути без хеша, которых нет в GetItems; проверяются и берутся, только если существуют.
+# Старые пути без хеша, которых нет в GetItems: имя -> варианты от лучшего качества к худшему.
+# Берётся первый существующий.
 _PROBED_ASSETS = {
-    "logo": "logo.png",
-    "logo_2x": "logo_2x.png",
+    "logo": ("logo_2x.png", "logo.png"),
 }
 
 _APP_URL_RE = re.compile(r"/app/(\d+)")
@@ -112,7 +107,7 @@ def artwork_from_item(app_id: int, item: dict[str, Any]) -> list[Artwork]:
 
     artworks: list[Artwork] = []
     for key in _ASSET_KEYS:
-        if filename := assets.get(key):
+        if filename := assets.get(f"{key}_2x") or assets.get(key):
             artworks.append(Artwork(key, _ASSET_CDN + url_format.replace("${FILENAME}", filename)))
 
     if bg_path := assets.get("page_background_path"):
@@ -132,10 +127,12 @@ def artwork_from_item(app_id: int, item: dict[str, Any]) -> list[Artwork]:
 
 def _probe_legacy_assets(app_id: int, client: httpx.Client) -> list[Artwork]:
     found: list[Artwork] = []
-    for name, filename in _PROBED_ASSETS.items():
-        url = f"{_ASSET_CDN}steam/apps/{app_id}/{filename}"
-        if client.head(url).status_code == 200:
-            found.append(Artwork(name, url))
+    for name, filenames in _PROBED_ASSETS.items():
+        for filename in filenames:
+            url = f"{_ASSET_CDN}steam/apps/{app_id}/{filename}"
+            if client.head(url).status_code == 200:
+                found.append(Artwork(name, url))
+                break
     return found
 
 
