@@ -1,0 +1,7 @@
+---
+description: Python code conventions
+globs: **/*.py
+alwaysApply: false
+---
+
+- Prefix module-level names (constants, functions, classes, variables) with `_` unless they are used outside their module (including tests).

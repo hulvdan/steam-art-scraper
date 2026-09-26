@@ -1,6 +1,8 @@
 import pytest
 
-from steam_art import ASSET_CDN, artwork_from_item, parse_app_id
+from steam_art import artwork_from_item, parse_app_id
+
+CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 
 
 @pytest.mark.parametrize(
@@ -41,10 +43,10 @@ def test_artwork_from_item() -> None:
     }
     arts = {a.name: a.url for a in artwork_from_item(item)}
     assert arts == {
-        "header": f"{ASSET_CDN}steam/apps/367520/abc/header.jpg?t=1",
-        "library_hero_2x": f"{ASSET_CDN}steam/apps/367520/def/library_hero_2x.jpg?t=1",
+        "header": f"{CDN}steam/apps/367520/abc/header.jpg?t=1",
+        "library_hero_2x": f"{CDN}steam/apps/367520/def/library_hero_2x.jpg?t=1",
         "page_background": "https://store.akamai.steamstatic.com/images/storepagebackground/app/367520?t=1",
         "community_icon": "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/367520/f6ab.jpg",
-        "screenshot_01": f"{ASSET_CDN}steam/apps/367520/ss_a.jpg?t=1",
-        "screenshot_02": f"{ASSET_CDN}steam/apps/367520/ss_b.jpg?t=1",
+        "screenshot_01": f"{CDN}steam/apps/367520/ss_a.jpg?t=1",
+        "screenshot_02": f"{CDN}steam/apps/367520/ss_b.jpg?t=1",
     }

@@ -1,0 +1,6 @@
+---
+description: How agent rules are maintained
+alwaysApply: true
+---
+
+- Rules live in two places and must stay in sync: `CLAUDE.md` (Claude) and `.cursor/rules/*.mdc` (Cursor). Whenever you add, change or remove a rule, update both.

@@ -5,11 +5,11 @@ import typer
 
 from steam_art import download_artwork, parse_app_id, scrape_artwork
 
-app = typer.Typer(help="Download Steam app artwork (no videos).")
+_app = typer.Typer(help="Download Steam app artwork (no videos).")
 
 
-@app.command()
-def main(
+@_app.command()
+def _main(
     app_ref: Annotated[str, typer.Argument(metavar="APP", help="Steam app id or store URL")],
     out: Annotated[
         Path | None, typer.Option("--out", "-o", help="Output dir (default: output/<app_id>)")
@@ -30,4 +30,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    _app()
