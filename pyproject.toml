@@ -1,13 +1,20 @@
 [project]
 name = "steam-art-scraper"
 version = "0.1.0"
-description = "Add your description here"
+description = "Download Steam app artwork (no videos)"
 readme = "README.md"
 requires-python = "==3.14.*"
 dependencies = [
     "httpx>=0.28.1",
     "typer>=0.27.2",
 ]
+
+[project.scripts]
+steam-art-scraper = "steam_art_scraper.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.10.3,<0.11"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
@@ -18,7 +25,6 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.pyrefly]
@@ -32,3 +38,6 @@ line-length = 100
 select = ["E", "F", "W", "I"]
 preview = true  # needed for E3xx blank-line rules
 ignore = ["E501"]  # line length handled by ruff format
+
+[tool.ruff.format]
+line-ending = "lf"

@@ -85,9 +85,8 @@ def _fetch_store_item(app_id: int, client: httpx.Client) -> dict[str, Any]:
     return items[0]
 
 
-def artwork_from_item(item: dict[str, Any]) -> list[Artwork]:
+def artwork_from_item(app_id: int, item: dict[str, Any]) -> list[Artwork]:
     """Build artwork URLs from a GetItems store item. Pure, no network."""
-    app_id = item["appid"]
     assets: dict[str, Any] = item.get("assets", {})
     url_format: str = assets.get("asset_url_format", f"steam/apps/{app_id}/${{FILENAME}}")
 
@@ -103,8 +102,10 @@ def artwork_from_item(item: dict[str, Any]) -> list[Artwork]:
         artworks.append(Artwork("community_icon", f"{_COMMUNITY_ICON_CDN}{app_id}/{icon}.jpg"))
 
     screenshots = item.get("screenshots", {}).get("all_ages_screenshots", [])
-    for shot in sorted(screenshots, key=lambda s: s.get("ordinal", 0)):
-        artworks.append(Artwork(f"screenshot_{shot['ordinal']:02d}", _ASSET_CDN + shot["filename"]))
+    shots = sorted(screenshots, key=lambda s: s.get("ordinal", 0))
+    filenames = [f for shot in shots if (f := shot.get("filename"))]
+    for i, filename in enumerate(filenames, start=1):
+        artworks.append(Artwork(f"screenshot_{i:02d}", _ASSET_CDN + filename))
 
     return artworks
 
@@ -125,7 +126,7 @@ def scrape_artwork(app: str | int, client: httpx.Client | None = None) -> list[A
     client = client or httpx.Client(timeout=30, follow_redirects=True)
     try:
         item = _fetch_store_item(app_id, client)
-        return artwork_from_item(item) + _probe_legacy_assets(app_id, client)
+        return artwork_from_item(app_id, item) + _probe_legacy_assets(app_id, client)
     finally:
         if owns_client:
             client.close()

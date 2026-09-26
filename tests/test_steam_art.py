@@ -1,6 +1,6 @@
 import pytest
 
-from steam_art import artwork_from_item, parse_app_id
+from steam_art_scraper.scraper import artwork_from_item, parse_app_id
 
 CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 
@@ -26,7 +26,6 @@ def test_parse_app_id_invalid() -> None:
 
 def test_artwork_from_item() -> None:
     item = {
-        "appid": 367520,
         "assets": {
             "asset_url_format": "steam/apps/367520/${FILENAME}?t=1",
             "header": "abc/header.jpg",
@@ -41,7 +40,7 @@ def test_artwork_from_item() -> None:
             ]
         },
     }
-    arts = {a.name: a.url for a in artwork_from_item(item)}
+    arts = {a.name: a.url for a in artwork_from_item(367520, item)}
     assert arts == {
         "header": f"{CDN}steam/apps/367520/abc/header.jpg?t=1",
         "library_hero_2x": f"{CDN}steam/apps/367520/def/library_hero_2x.jpg?t=1",

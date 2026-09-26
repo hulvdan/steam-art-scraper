@@ -34,3 +34,6 @@ data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Claude Code local overrides
+.claude/settings.local.json

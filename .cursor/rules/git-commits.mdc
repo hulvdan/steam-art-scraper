@@ -4,4 +4,5 @@ alwaysApply: true
 ---
 
 - After finishing a code change and before committing, run a reviewer subagent on the diff. Fix or explicitly dismiss its findings, then commit.
+- Write commit messages in Russian, as a single line. Use impersonal passive past form ("Сделан X", "Добавлен Y", "Исправлена Z"), not first person ("Сделал X").
 - Never add `Co-authored-by` (or any AI attribution) trailers to commit messages or PR descriptions.
