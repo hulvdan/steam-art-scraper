@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 import httpx
 
 _STORE_BROWSE_URL = "https://api.steampowered.com/IStoreBrowseService/GetItems/v1"
+_APP_REVIEWS_URL = "https://store.steampowered.com/appreviews/{app_id}"
 _ASSET_CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 _PAGE_BACKGROUND_CDN = "https://store.akamai.steamstatic.com/images/storepagebackground/"
 _COMMUNITY_ICON_CDN = "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/"
@@ -58,16 +59,29 @@ class Artwork:
 
 
 @dataclass(frozen=True)
+class Reviews:
+    total: int
+    positive: int
+
+    def __str__(self) -> str:
+        """`1234, 85.1%` — число всех обзоров и доля положительных."""
+        if not self.total:
+            return "0"
+        return f"{self.total}, {self.positive / self.total * 100:.1f}%"
+
+
+@dataclass(frozen=True)
 class ScrapedApp:
     app_id: int
     name: str
     slug: str
     artworks: list[Artwork]
+    reviews: Reviews
 
     def dir_name(self, at: datetime) -> str:
-        """Имя папки вида `20260926 130512 - Hollow_Knight` (время импорта)."""
+        """Имя папки вида `20260926 130512 - Hollow_Knight (1234, 85.1%)` (время импорта)."""
         slug = _UNSAFE_PATH_CHARS_RE.sub("_", self.slug).strip(" .") or str(self.app_id)
-        return f"{at:%Y%m%d %H%M%S} - {slug}"
+        return f"{at:%Y%m%d %H%M%S} - {slug} ({self.reviews})"
 
 
 class SteamAppNotFound(LookupError):
@@ -98,6 +112,15 @@ def _fetch_store_item(app_id: int, client: httpx.Client) -> dict[str, Any]:
     if not items or items[0].get("success") != 1:
         raise SteamAppNotFound(f"Steam app {app_id} not found")
     return items[0]
+
+
+def _fetch_reviews(app_id: int, client: httpx.Client) -> Reviews:
+    """Обзоры на всех языках и от всех покупателей (как «Все обзоры» в магазине)."""
+    params = {"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0}
+    resp = client.get(_APP_REVIEWS_URL.format(app_id=app_id), params=params)
+    resp.raise_for_status()
+    summary = resp.json().get("query_summary", {})
+    return Reviews(summary.get("total_reviews", 0), summary.get("total_positive", 0))
 
 
 def artwork_from_item(app_id: int, item: dict[str, Any]) -> list[Artwork]:
@@ -146,7 +169,8 @@ def scrape_artwork(app: str | int, client: httpx.Client | None = None) -> Scrape
         name: str = item.get("name", "")
         slug: str = item.get("store_url_slug") or name.replace(" ", "_")
         artworks = artwork_from_item(app_id, item) + _probe_legacy_assets(app_id, client)
-        return ScrapedApp(app_id, name, slug, artworks)
+        reviews = _fetch_reviews(app_id, client)
+        return ScrapedApp(app_id, name, slug, artworks, reviews)
     finally:
         if owns_client:
             client.close()

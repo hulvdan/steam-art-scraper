@@ -30,7 +30,11 @@ def _main(
     ] = None,
     out: Annotated[
         Path,
-        typer.Option("--out", "-o", help="Root dir; each app goes to 'YYYYMMDD HHMMSS - Title'"),
+        typer.Option(
+            "--out",
+            "-o",
+            help="Root dir; each app goes to 'YYYYMMDD HHMMSS - Title (reviews, positive%)'",
+        ),
     ] = Path("output"),
     list_only: Annotated[
         bool, typer.Option("--list", help="Only print URLs, don't download")
