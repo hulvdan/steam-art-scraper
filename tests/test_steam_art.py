@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -149,9 +150,25 @@ def test_group_by_asset(tmp_path: Path) -> None:
     group_by_asset(tmp_path)
 
     assert sorted(p.name for p in tmp_path.glob("_*")) == ["_header", "_logo"]
+    assert not list(tmp_path.glob("_screenshot*"))
     logos = {p.name: p.read_bytes() for p in (tmp_path / "_logo").iterdir()}
     assert logos == {
         "20260101 000000 - A.png": b"20260101 000000 - A",
         "20260101 000001 - B.png": b"20260101 000001 - B",
     }
     assert (tmp_path / "_header" / "20260101 000000 - A.jpg").read_bytes() == b"h"
+
+
+def test_group_by_asset_falls_back_to_hardlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def no_symlinks(*_: object) -> None:
+        raise OSError("symlinks not permitted")
+
+    monkeypatch.setattr(Path, "symlink_to", no_symlinks)
+    (tmp_path / "game").mkdir()
+    (tmp_path / "game" / "logo.png").write_bytes(b"x")
+    group_by_asset(tmp_path)
+    link = tmp_path / "_logo" / "game.png"
+    assert not link.is_symlink()
+    assert os.path.samefile(link, tmp_path / "game" / "logo.png")

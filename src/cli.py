@@ -74,7 +74,11 @@ def _main(
         typer.echo(f"{dir_name}: {len(paths)} files" + (f" ({missing} missing)" if missing else ""))
 
     if not list_only:
-        group_by_asset(out)
+        try:
+            group_by_asset(out)
+        except OSError as e:
+            typer.echo(f"Error (grouping by asset): {e}", err=True)
+            failed = True
 
     if failed:
         raise typer.Exit(1)
