@@ -5,7 +5,13 @@ from typing import Annotated
 import httpx
 import typer
 
-from scraper import SteamAppNotFound, import_artwork, remove_partials, scrape_artwork
+from scraper import (
+    SteamAppNotFound,
+    group_by_asset,
+    import_artwork,
+    remove_partials,
+    scrape_artwork,
+)
 
 app = typer.Typer(help="Download Steam app artwork (no videos).")
 
@@ -66,6 +72,9 @@ def _main(
             continue
         missing = len(scraped.artworks) - len(paths)
         typer.echo(f"{dir_name}: {len(paths)} files" + (f" ({missing} missing)" if missing else ""))
+
+    if not list_only:
+        group_by_asset(out)
 
     if failed:
         raise typer.Exit(1)

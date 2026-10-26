@@ -44,6 +44,11 @@ _UNSAFE_PATH_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 # Суффикс папки, в которую идёт загрузка; до переименования игра считается неимпортированной.
 _PARTIAL_SUFFIX = ".partial"
 
+# Типы арта, которые собираются в папки `_<тип>` со ссылками на файлы всех игр.
+# Скриншоты не группируются.
+_GROUPED_ASSETS = (*_ASSET_KEYS, "page_background", "community_icon", *_PROBED_ASSETS)
+_GROUP_PREFIX = "_"
+
 _CONTENT_TYPE_EXT = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -229,3 +234,38 @@ def remove_partials(out: Path) -> None:
         for path in out.glob("*" + _PARTIAL_SUFFIX):
             if path.is_dir():
                 shutil.rmtree(path, ignore_errors=True)
+
+
+def _link(link: Path, target: Path) -> None:
+    """Создаёт относительный симлинк `link` -> `target` (target лежит в соседней папке)."""
+    try:
+        link.symlink_to(Path("..", target.parent.name, target.name))
+    except OSError:
+        # Без режима разработчика Windows не даёт создавать симлинки — берётся жёсткая ссылка.
+        link.hardlink_to(target)
+
+
+def group_by_asset(out: Path) -> None:
+    """Пересобирает папки `_<тип>` (`_logo`, `_library_hero`, ...) со ссылками на арт всех игр.
+
+    Ссылка называется по папке игры: `_logo/<папка игры>.png`. Скриншоты не группируются.
+    """
+    if not out.is_dir():
+        return
+    for asset in _GROUPED_ASSETS:
+        shutil.rmtree(out / (_GROUP_PREFIX + asset), ignore_errors=True)
+
+    games = [
+        p
+        for p in out.iterdir()
+        if p.is_dir()
+        and not p.name.startswith(_GROUP_PREFIX)
+        and not p.name.endswith(_PARTIAL_SUFFIX)
+    ]
+    for game in sorted(games):
+        for file in game.iterdir():
+            if file.stem not in _GROUPED_ASSETS or not file.is_file():
+                continue
+            group = out / (_GROUP_PREFIX + file.stem)
+            group.mkdir(exist_ok=True)
+            _link(group / (game.name + file.suffix), file)

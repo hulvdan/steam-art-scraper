@@ -10,6 +10,7 @@ from scraper import (
     ScrapedApp,
     artwork_from_item,
     download_artwork,
+    group_by_asset,
     import_artwork,
     parse_app_id,
     remove_partials,
@@ -133,3 +134,24 @@ def test_remove_partials(tmp_path: Path) -> None:
     (tmp_path / "20260101 000000 - B").mkdir()
     remove_partials(tmp_path)
     assert [p.name for p in tmp_path.iterdir()] == ["20260101 000000 - B"]
+
+
+def test_group_by_asset(tmp_path: Path) -> None:
+    for game in ("20260101 000000 - A", "20260101 000001 - B", "C.partial"):
+        (tmp_path / game).mkdir()
+        (tmp_path / game / "logo.png").write_bytes(game.encode())
+        (tmp_path / game / "screenshot_01.jpg").write_bytes(b"")
+    (tmp_path / "20260101 000000 - A" / "header.jpg").write_bytes(b"h")
+    (tmp_path / "_logo").mkdir()
+    (tmp_path / "_logo" / "stale.png").write_bytes(b"")
+
+    group_by_asset(tmp_path)
+    group_by_asset(tmp_path)
+
+    assert sorted(p.name for p in tmp_path.glob("_*")) == ["_header", "_logo"]
+    logos = {p.name: p.read_bytes() for p in (tmp_path / "_logo").iterdir()}
+    assert logos == {
+        "20260101 000000 - A.png": b"20260101 000000 - A",
+        "20260101 000001 - B.png": b"20260101 000001 - B",
+    }
+    assert (tmp_path / "_header" / "20260101 000000 - A.jpg").read_bytes() == b"h"
