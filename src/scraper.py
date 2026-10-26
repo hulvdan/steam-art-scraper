@@ -236,17 +236,8 @@ def remove_partials(out: Path) -> None:
                 shutil.rmtree(path, ignore_errors=True)
 
 
-def _link(link: Path, target: Path) -> None:
-    """Создаёт относительный симлинк `link` -> `target` (target лежит в соседней папке)."""
-    try:
-        link.symlink_to(Path("..", target.parent.name, target.name))
-    except OSError:
-        # Без режима разработчика Windows не даёт создавать симлинки — берётся жёсткая ссылка.
-        link.hardlink_to(target)
-
-
 def group_by_asset(out: Path) -> None:
-    """Пересобирает папки `_<тип>` (`_logo`, `_library_hero`, ...) со ссылками на арт всех игр.
+    """Пересобирает папки `_<тип>` (`_logo`, `_library_hero`, ...) с жёсткими ссылками на арт всех игр.
 
     Ссылка называется по папке игры: `_logo/<папка игры>.png`. Скриншоты не группируются.
     """
@@ -268,4 +259,4 @@ def group_by_asset(out: Path) -> None:
                 continue
             group = out / (_GROUP_PREFIX + file.stem)
             group.mkdir(exist_ok=True)
-            _link(group / (game.name + file.suffix), file)
+            (group / (game.name + file.suffix)).hardlink_to(file)
