@@ -9,12 +9,17 @@ from scraper import (
     Artwork,
     Reviews,
     ScrapedApp,
+    TrailerError,
+    TrailerStream,
     artwork_from_item,
     download_artwork,
+    download_trailer,
     group_by_asset,
     import_artwork,
     parse_app_id,
+    pick_trailer_streams,
     remove_partials,
+    trailer_from_item,
 )
 
 CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
@@ -65,6 +70,92 @@ def test_artwork_from_item() -> None:
         "screenshot_01": f"{CDN}steam/apps/367520/ss_a.jpg?t=1",
         "screenshot_02": f"{CDN}steam/apps/367520/ss_b.jpg?t=1",
     }
+
+
+def _trailer(base_id: int, path: str) -> dict[str, object]:
+    return {
+        "trailer_base_id": base_id,
+        "adaptive_trailers": [
+            {"cdn_path": f"{path}/dash_av1.mpd", "encoding": "dash_av1"},
+            {"cdn_path": f"{path}/dash_h264.mpd", "encoding": "dash_h264"},
+        ],
+    }
+
+
+def test_trailer_from_item_picks_newest() -> None:
+    item = {
+        "trailers": {
+            "highlights": [_trailer(961743, "1/new"), _trailer(116737, "1/old")],
+            "other_trailers": [_trailer(209267, "1/mid")],
+        }
+    }
+    assert trailer_from_item(item) == (
+        "https://video.akamai.steamstatic.com/store_trailers/1/new/dash_h264.mpd"
+    )
+
+
+def test_trailer_from_item_none() -> None:
+    assert trailer_from_item({}) is None
+    assert trailer_from_item({"trailers": {"highlights": [{"trailer_base_id": 1}]}}) is None
+
+
+_MPD_URL = "https://video.test/t/dash_h264.mpd"
+
+
+def _mpd(frame_rate: str, *heights: int) -> str:
+    template = (
+        '<SegmentTemplate timescale="1000000" duration="3000000" startNumber="1"'
+        ' initialization="d/init-$RepresentationID$.m4s"'
+        ' media="d/chunk-$RepresentationID$-$Number%05d$.m4s"/>'
+    )
+    videos = "".join(
+        f'<Representation id="{i}" bandwidth="{h * 1000}" height="{h}">{template}</Representation>'
+        for i, h in enumerate(heights)
+    )
+    return f"""<?xml version="1.0"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT6.1S">
+  <Period>
+    <AdaptationSet contentType="video" frameRate="{frame_rate}">{videos}</AdaptationSet>
+    <AdaptationSet contentType="audio">
+      <Representation id="a" bandwidth="128000">{template}</Representation>
+    </AdaptationSet>
+    <AdaptationSet contentType="image"><Representation id="thumbs" bandwidth="0"/></AdaptationSet>
+  </Period>
+</MPD>"""
+
+
+def test_pick_trailer_streams() -> None:
+    streams = pick_trailer_streams(_MPD_URL, _mpd("60000/1001", 2160, 1080, 720))
+    assert streams == [
+        TrailerStream(
+            "https://video.test/t/d/init-1.m4s",
+            [f"https://video.test/t/d/chunk-1-0000{n}.m4s" for n in (1, 2, 3)],
+        ),
+        TrailerStream(
+            "https://video.test/t/d/init-a.m4s",
+            [f"https://video.test/t/d/chunk-a-0000{n}.m4s" for n in (1, 2, 3)],
+        ),
+    ]
+
+
+@pytest.mark.parametrize("frame_rate", ["120/1", ""])
+def test_pick_trailer_streams_rejects_high_or_unknown_fps(frame_rate: str) -> None:
+    assert pick_trailer_streams(_MPD_URL, _mpd(frame_rate, 1080)) == []
+
+
+def test_pick_trailer_streams_malformed() -> None:
+    with pytest.raises(TrailerError):
+        pick_trailer_streams(_MPD_URL, "<MPD")
+
+
+def test_download_trailer_skips_unsuitable(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == _MPD_URL
+        return httpx.Response(200, text=_mpd("30/1", 2160))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        assert download_trailer(_MPD_URL, tmp_path, client) is None
+    assert list(tmp_path.iterdir()) == []
 
 
 _AT = datetime(2026, 9, 26, 13, 5, 2)

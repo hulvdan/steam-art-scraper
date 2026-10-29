@@ -1,11 +1,12 @@
 [project]
 name = "steam-art-scraper"
 version = "0.1.0"
-description = "Download Steam app artwork (no videos)"
+description = "Download Steam app artwork and the most recent trailer"
 readme = "README.md"
 requires-python = "==3.14.*"
 dependencies = [
     "httpx>=0.28.1",
+    "imageio-ffmpeg>=0.7.0",
     "typer>=0.27.2",
 ]
 

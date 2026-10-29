@@ -7,13 +7,14 @@ import typer
 
 from scraper import (
     SteamAppNotFound,
+    TrailerError,
     group_by_asset,
     import_artwork,
     remove_partials,
     scrape_artwork,
 )
 
-app = typer.Typer(help="Download Steam app artwork (no videos).")
+app = typer.Typer(help="Download Steam app artwork and the most recent trailer.")
 
 
 def _read_refs(path: Path) -> list[str]:
@@ -63,14 +64,16 @@ def _main(
             if list_only:
                 for art in scraped.artworks:
                     typer.echo(f"{scraped.app_id}\t{art.name}\t{art.url}")
+                if scraped.trailer:
+                    typer.echo(f"{scraped.app_id}\ttrailer\t{scraped.trailer}")
                 continue
             dir_name = scraped.dir_name(datetime.now())
-            paths = import_artwork(scraped.artworks, out / dir_name)
-        except (ValueError, SteamAppNotFound, httpx.HTTPError, OSError) as e:
+            paths = import_artwork(scraped.artworks, out / dir_name, trailer=scraped.trailer)
+        except (ValueError, SteamAppNotFound, TrailerError, httpx.HTTPError, OSError) as e:
             typer.echo(f"Error ({app_ref}): {e}", err=True)
             failed = True
             continue
-        missing = len(scraped.artworks) - len(paths)
+        missing = len(scraped.artworks) + bool(scraped.trailer) - len(paths)
         typer.echo(f"{dir_name}: {len(paths)} files" + (f" ({missing} missing)" if missing else ""))
 
     if not list_only:
