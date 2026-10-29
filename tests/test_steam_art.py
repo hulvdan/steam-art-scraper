@@ -19,6 +19,7 @@ from scraper import (
     parse_app_id,
     pick_trailer_streams,
     remove_partials,
+    reviews_from_item,
     trailer_from_item,
 )
 
@@ -164,21 +165,32 @@ _AT = datetime(2026, 9, 26, 13, 5, 2)
 @pytest.mark.parametrize(
     ("slug", "expected"),
     [
-        ("Hollow_Knight", "20260926 130502 - Hollow_Knight (1234, 85.1%)"),
-        ("Bad:Name/With*Chars?.", "20260926 130502 - Bad_Name_With_Chars_ (1234, 85.1%)"),
-        ("", "20260926 130502 - 367520 (1234, 85.1%)"),
+        ("Hollow_Knight", "20260926 130502 - Hollow_Knight (1234, 85%)"),
+        ("Bad:Name/With*Chars?.", "20260926 130502 - Bad_Name_With_Chars_ (1234, 85%)"),
+        ("", "20260926 130502 - 367520 (1234, 85%)"),
     ],
 )
 def test_dir_name(slug: str, expected: str) -> None:
-    assert ScrapedApp(367520, "", slug, [], Reviews(1234, 1050)).dir_name(_AT) == expected
+    assert ScrapedApp(367520, "", slug, [], Reviews(1234, 85)).dir_name(_AT) == expected
 
 
 @pytest.mark.parametrize(
     ("reviews", "expected"),
-    [(Reviews(1234, 1050), "1234, 85.1%"), (Reviews(3, 3), "3, 100.0%"), (Reviews(0, 0), "0")],
+    [(Reviews(1234, 85), "1234, 85%"), (Reviews(3, 100), "3, 100%"), (Reviews(0, 0), "0")],
 )
 def test_reviews_str(reviews: Reviews, expected: str) -> None:
     assert str(reviews) == expected
+
+
+def test_reviews_from_item() -> None:
+    item = {
+        "reviews": {
+            "summary_filtered": {"review_count": 507705, "percent_positive": 96},
+            "summary_language_specific": {"review_count": 185835, "percent_positive": 97},
+        }
+    }
+    assert reviews_from_item(item) == Reviews(507705, 96)
+    assert reviews_from_item({}) == Reviews(0, 0)
 
 
 def test_download_artwork_skips_404(tmp_path: Path) -> None:

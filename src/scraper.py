@@ -20,7 +20,6 @@ import httpx
 import imageio_ffmpeg
 
 _STORE_BROWSE_URL = "https://api.steampowered.com/IStoreBrowseService/GetItems/v1"
-_APP_REVIEWS_URL = "https://store.steampowered.com/appreviews/{app_id}"
 _ASSET_CDN = "https://shared.akamai.steamstatic.com/store_item_assets/"
 _PAGE_BACKGROUND_CDN = "https://store.akamai.steamstatic.com/images/storepagebackground/"
 _COMMUNITY_ICON_CDN = "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/"
@@ -89,13 +88,13 @@ class Artwork:
 @dataclass(frozen=True)
 class Reviews:
     total: int
-    positive: int
+    percent_positive: int
 
     def __str__(self) -> str:
-        """`1234, 85.1%` — число всех обзоров и доля положительных."""
+        """`1234, 85%` — число обзоров и доля положительных."""
         if not self.total:
             return "0"
-        return f"{self.total}, {self.positive / self.total * 100:.1f}%"
+        return f"{self.total}, {self.percent_positive}%"
 
 
 @dataclass(frozen=True)
@@ -150,6 +149,7 @@ def _fetch_store_item(app_id: int, client: httpx.Client) -> dict[str, Any]:
             "include_assets": True,
             "include_screenshots": True,
             "include_trailers": True,
+            "include_reviews": True,
         },
     }
     resp = client.get(_STORE_BROWSE_URL, params={"input_json": json.dumps(input_json)})
@@ -160,13 +160,14 @@ def _fetch_store_item(app_id: int, client: httpx.Client) -> dict[str, Any]:
     return items[0]
 
 
-def _fetch_reviews(app_id: int, client: httpx.Client) -> Reviews:
-    """Обзоры на всех языках и от всех покупателей (как «Все обзоры» в магазине)."""
-    params = {"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0}
-    resp = client.get(_APP_REVIEWS_URL.format(app_id=app_id), params=params)
-    resp.raise_for_status()
-    summary = resp.json().get("query_summary", {})
-    return Reviews(summary.get("total_reviews", 0), summary.get("total_positive", 0))
+def reviews_from_item(item: dict[str, Any]) -> Reviews:
+    """Обзоры на всех языках из элемента ответа GetItems (как «Все обзоры» в магазине).
+
+    Steam отдаёт число без обзоров, отфильтрованных как не относящиеся к игре, и долю
+    положительных в целых процентах. Чистая функция, без сети.
+    """
+    summary = item.get("reviews", {}).get("summary_filtered", {})
+    return Reviews(summary.get("review_count", 0), summary.get("percent_positive", 0))
 
 
 def artwork_from_item(app_id: int, item: dict[str, Any]) -> list[Artwork]:
@@ -360,8 +361,9 @@ def scrape_artwork(app: str | int, client: httpx.Client | None = None) -> Scrape
         name: str = item.get("name", "")
         slug: str = item.get("store_url_slug") or name.replace(" ", "_")
         artworks = artwork_from_item(app_id, item) + _probe_legacy_assets(app_id, client)
-        reviews = _fetch_reviews(app_id, client)
-        return ScrapedApp(app_id, name, slug, artworks, reviews, trailer_from_item(item))
+        return ScrapedApp(
+            app_id, name, slug, artworks, reviews_from_item(item), trailer_from_item(item)
+        )
     finally:
         if owns_client:
             client.close()
