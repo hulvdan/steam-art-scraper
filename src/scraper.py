@@ -9,11 +9,13 @@ import re
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
+from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from fractions import Fraction
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -32,6 +34,8 @@ _TRAILER_MAX_HEIGHT = 1080
 _TRAILER_MAX_FPS = 60
 # Склейка без перекодирования занимает секунды; дольше — значит ffmpeg завис.
 _FFMPEG_TIMEOUT_SECONDS = 600
+# Сколько сегментов трейлера качается одновременно.
+_SEGMENT_WORKERS = 8
 _MPD_NS = "{urn:mpeg:dash:schema:mpd:2011}"
 _ISO_DURATION_RE = re.compile(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?")
 _SEGMENT_NUMBER_RE = re.compile(r"\$Number(?:%0(\d+)d)?\$")
@@ -313,6 +317,33 @@ def _mux(parts: list[Path], out: Path) -> None:
         raise TrailerError(f"ffmpeg failed: {result.stderr.strip()}")
 
 
+def _get_content(url: str, client: httpx.Client) -> bytes:
+    resp = client.get(url)
+    resp.raise_for_status()
+    return resp.content
+
+
+def download_segments(urls: list[str], f: IO[bytes], client: httpx.Client) -> None:
+    """Качает сегменты параллельно и пишет в `f` по порядку.
+
+    Впереди записи качается не больше `2 * _SEGMENT_WORKERS` сегментов, чтобы не держать весь
+    трейлер в памяти.
+    """
+    with ThreadPoolExecutor(_SEGMENT_WORKERS) as pool:
+        pending: deque[Future[bytes]] = deque()
+        try:
+            for url in urls:
+                pending.append(pool.submit(_get_content, url, client))
+                if len(pending) >= 2 * _SEGMENT_WORKERS:
+                    f.write(pending.popleft().result())
+            while pending:
+                f.write(pending.popleft().result())
+        except BaseException:
+            for future in pending:
+                future.cancel()
+            raise
+
+
 def download_trailer(mpd_url: str, dest: Path, client: httpx.Client) -> Path | None:
     """Скачивает трейлер в `dest/trailer.mp4`. None, если манифеста нет или видео не подходит."""
     resp = client.get(mpd_url)
@@ -327,10 +358,7 @@ def download_trailer(mpd_url: str, dest: Path, client: httpx.Client) -> Path | N
     for i, stream in enumerate(streams):
         part = dest / f"{_TRAILER_NAME}.part{i}.mp4"
         with part.open("wb") as f:
-            for url in (stream.init_url, *stream.chunk_urls):
-                chunk = client.get(url)
-                chunk.raise_for_status()
-                f.write(chunk.content)
+            download_segments([stream.init_url, *stream.chunk_urls], f, client)
         parts.append(part)
 
     path = dest / (_TRAILER_NAME + ".mp4")

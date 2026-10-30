@@ -1,4 +1,6 @@
+import io
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +15,7 @@ from scraper import (
     TrailerStream,
     artwork_from_item,
     download_artwork,
+    download_segments,
     download_trailer,
     group_by_asset,
     import_artwork,
@@ -157,6 +160,30 @@ def test_download_trailer_skips_unsuitable(tmp_path: Path) -> None:
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         assert download_trailer(_MPD_URL, tmp_path, client) is None
     assert list(tmp_path.iterdir()) == []
+
+
+def test_download_segments_keeps_order() -> None:
+    urls = [f"https://video.test/{i}" for i in range(40)]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        i = int(request.url.path.strip("/"))
+        # Ранние сегменты отвечают дольше поздних.
+        time.sleep((40 - i) / 4000)
+        return httpx.Response(200, content=f"<{i}>".encode())
+
+    f = io.BytesIO()
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        download_segments(urls, f, client)
+    assert f.getvalue() == b"".join(f"<{i}>".encode() for i in range(40))
+
+
+def test_download_segments_raises_on_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404 if request.url.path == "/3" else 200, content=b"x")
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(httpx.HTTPStatusError):
+            download_segments([f"https://video.test/{i}" for i in range(10)], io.BytesIO(), client)
 
 
 _AT = datetime(2026, 9, 26, 13, 5, 2)
